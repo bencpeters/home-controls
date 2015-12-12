@@ -17,6 +17,7 @@ from home_controller.log import logger
 
 class SensorTypes(Enum):
     RANDOM_VALUES = 0
+    SINE_WAVE = 1
 
 class SensorData(Base):
     """Class for sensor data tuple in DB. A record should be created every time

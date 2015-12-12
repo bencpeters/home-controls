@@ -1,2 +1,2 @@
 from .models import SensorData, SensorDataValues, Sensor
-from .random import RandomValuesSensor
+from .generated import RandomValuesSensor, SineWaveSensor
