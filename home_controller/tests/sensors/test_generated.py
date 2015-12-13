@@ -7,8 +7,7 @@ from nose.tools import *
 from time import sleep
 
 from home_controller.tests import DatabaseTest
-from home_controller.sensors import \
-    SensorDataValues, RandomValuesSensor, Sensor, SineWaveSensor
+from home_controller.sensors import RandomValuesSensor, Sensor, SineWaveSensor
 
 class TestRandomSensor(DatabaseTest):
     """
@@ -21,7 +20,7 @@ class TestRandomSensor(DatabaseTest):
     def _test_random_value(self, values):
         eq_(len(values), 2)
         for val in values:
-            ok_(isinstance(val, SensorDataValues),
+            ok_(isinstance(val, Sensor.value_type),
                 "Type of values should be SensorDataValues, got {}".format(
                     type(val)))
             ok_(abs(val.value) < 100,
@@ -32,6 +31,7 @@ class TestRandomSensor(DatabaseTest):
 
     def test_update_sensor_reads_sensor(self):
         self.sensor.update()
+        sleep(0.1)
         records = self.sensor.data
         eq_(len(records), 1)
         self._test_random_value(records[0].values)
@@ -39,6 +39,7 @@ class TestRandomSensor(DatabaseTest):
     def test_update_sensor_adds_objects_to_db(self):
         eq_(len(self.sensor.data), 0)
         self.sensor.update()
+        sleep(0.1)
         records = self.session.query(Sensor). \
             filter(Sensor.id == self.sensor.id).first().data
         eq_(len(records), 1)
@@ -55,7 +56,7 @@ class TestSineWaveSensor(DatabaseTest):
 
     def test_read_sensor(self):
         start_val = self.sensor.read()[0]
-        ok_(isinstance(start_val, SensorDataValues),
+        ok_(isinstance(start_val, Sensor.value_type),
             "Type of values should be SensorDataValues, got {}".format(
             type(start_val)))
 

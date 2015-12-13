@@ -7,26 +7,26 @@ import random
 from time import time
 from math import sin, pi
 
-from .models import Sensor, SensorDataValues, SensorTypes
+from .models import Sensor
 
 class RandomValuesSensor(Sensor):
     """Randomly generates two values in [0, 1.0] using `random.random()`
     """
     __mapper_args__ = {
-        'polymorphic_identity': SensorTypes.RANDOM_VALUES.value
+        'polymorphic_identity': Sensor.types.RANDOM_VALUES.value
     }
 
-    def __init__(self, **kwargs):
-        self.type = SensorTypes.RANDOM_VALUES.value
+    def __init__(self, *args, **kwargs):
         random.seed()
-        super().__init__(**kwargs)
+        self.type = self.types.RANDOM_VALUES.value
+        super(RandomValuesSensor, self).__init__(*args, **kwargs)
 
     def read(self, *args, **kwargs):
         """Generates 2 random values
 
         Returns `SensorDataValues` objects
         """
-        return [ SensorDataValues(random.random(), "value_{}".format(i)) \
+        return [ self.value_type(random.random(), "value_{}".format(i)) \
                  for i in range(0, 2) ]
 
 class SineWaveSensor(Sensor):
@@ -35,7 +35,7 @@ class SineWaveSensor(Sensor):
     """
 
     __mapper_args__ = {
-        'polymorphic_identity': SensorTypes.SINE_WAVE.value
+        'polymorphic_identity': Sensor.types.SINE_WAVE.value
     }
 
     def __init__(self, period=60, min_value=0, max_value=10, **kwargs):
@@ -44,7 +44,6 @@ class SineWaveSensor(Sensor):
         :param min_value: minimum value for the sensor
         :param max_value: maximum value for the sensor
         """
-        self.type = SensorTypes.SINE_WAVE.value
         self.period = period
         if (self.period <= 0):
             raise ValueError("period ({}) must be greater than 0!".format(
@@ -56,7 +55,8 @@ class SineWaveSensor(Sensor):
             raise ValueError("max_value ({}) must be greater than min_value "
                              "({})".format(max_value, min_value))
         self._start = time()
-        super().__init__(**kwargs)
+        self.type = self.types.SINE_WAVE.value
+        super(SineWaveSensor, self).__init__(**kwargs)
 
     def read(self, *args, **kwargs):
         """Starts the internal Sine Wave generator and outputs its value based
@@ -65,4 +65,4 @@ class SineWaveSensor(Sensor):
         amp = (self.max - self.min) / 2
         offset = amp + self.min
         interval = (time() - self._start) * 2 * pi / self.period
-        return [ SensorDataValues(sin(interval) * amp + offset, "value") ]
+        return [ self.value_type(sin(interval) * amp + offset, "value") ]

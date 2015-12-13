@@ -6,10 +6,35 @@
 import json
 
 from sqlalchemy.types import TypeDecorator, VARCHAR
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, scoped_session, relationship
+from sqlalchemy.ext.declarative import declarative_base, declared_attr
+from sqlalchemy import (
+    ForeignKey, Column, DateTime, Integer, Float, Unicode
+)
+from sqlalchemy.sql.expression import func
 
-Base = declarative_base()
+from home_controller.log import logger
+
+
+class Base(object):
+    """Mixin to augment the declarative base with logging & other common model
+    functionality
+    """
+    @property
+    def log(self):
+        return logger
+Base = declarative_base(cls=Base)
+
+class Timestamps(object):
+    """Mixin for adding TimeStamp columns to a model
+    """
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now())
+
+class UniqueId(object):
+    """Mixin for adding a unique id column to a model
+    """
+    id = Column(Integer, primary_key=True, nullable=False)
 
 class JSONEncodedDict(TypeDecorator):
     """Represents an immutable structure as a json-encoded string.
@@ -36,3 +61,80 @@ class JSONEncodedDict(TypeDecorator):
 
 session_factory = sessionmaker()
 Session = scoped_session(session_factory)
+
+class BaseType(object):
+    """Mixin for a class that is intended to be the base class for a wide
+    variety of inherited types.
+    """
+    @declared_attr
+    def type_(cls):
+        return Column(Integer, nullable=False)
+    attributes = Column(JSONEncodedDict)
+
+    __mapper_args__ = {
+        "polymorphic_on": type_
+    }
+
+    @property
+    def type_string(self):
+        """Accessor for the string type name
+        """
+        if getattr(self, "types", None) is not None:
+            return self.types(self.type).name
+
+class HasFloatDataCollection(object):
+    """Mixin to add data collection tables & relationships.
+    """
+    @declared_attr
+    def data(cls):
+        class DataCollection(UniqueId, Base):
+            __tablename__ = cls.data_table_name
+            timestamp = Column(DateTime)
+            values = relationship("DataCollectionValues", backref="record")
+            parent_id = Column(Integer,
+                               ForeignKey("{}.id".format(cls.__tablename__)),
+                               nullable=False)
+
+            def __init__(self, parent, values):
+                try:
+                    len(values)
+                    self.values = values
+                except:
+                    self.values = [values]
+
+                self.parent = parent
+
+        class DataCollectionValues(UniqueId, Base):
+            __tablename__ = cls.data_table_name + "_values"
+            record_id = Column(Integer,
+                               ForeignKey("{}.id".format(cls.data_table_name)),
+                               nullable=False)
+            value = Column(Float)
+            name = Column(Unicode(20), nullable=False)
+
+            def __init__(self, value, name, record=None):
+                self.value = value
+                self.name = name
+                self.record = record
+
+        cls.value_type = DataCollectionValues
+        cls.record_type = DataCollection
+
+        return relationship(DataCollection, backref="parent")
+
+    def _update_data(self, data):
+        """Helper function to update the DB with new data values
+
+        Create our own session so that we're threadsafe
+        """
+        session = Session()
+        session.add(self.record_type(self, data))
+        session.commit()
+        self._latest_data = data
+        try:
+            self.log.debug("Updated data for {cls_name} {name}".format(
+                cls_name=self.__class__.__name__,
+                name=self.name,
+            ))
+        except AttributeError:
+            pass
