@@ -30,7 +30,7 @@ class ThreadedExecutor(object):
         :param run_sync: Boolean flag to run function synchronously. Defaults to
                          False.
         """
-        future = self.executor.submit(fxn, args, kwargs)
+        future = self.executor.submit(fxn, *args, **kwargs)
 
         if 'run_sync' in kwargs and kwargs['run_sync']:
             values = future.result()
