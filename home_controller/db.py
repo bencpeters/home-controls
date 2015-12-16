@@ -4,6 +4,7 @@
 # Ben Peters (bencpeters@gmail.com)
 
 import json
+from datetime import datetime
 
 from sqlalchemy.types import TypeDecorator, VARCHAR
 from sqlalchemy.orm import sessionmaker, scoped_session, relationship
@@ -82,45 +83,65 @@ class BaseType(object):
         if getattr(self, "types", None) is not None:
             return self.types(self.type).name
 
+class _DataCollection(UniqueId):
+    """Base class that gets used for dynamically created classes in
+    HasFloatDataCollection mixin. This is the collection of values that is
+    linked with the parent class.
+    """
+    timestamp = Column(DateTime)
+
+    def __init__(self, parent, values):
+        try:
+            len(values)
+            self.values = values
+        except:
+            self.values = [values]
+
+        self.parent = parent
+
+class _DataCollectionValues(UniqueId):
+    """Base class that gets used for dynamically created classes in
+    HasFloatDataCollection mixin. This is the actual value holder that is
+    linked with the records collection.
+    """
+    value = Column(Float)
+    name = Column(Unicode(20), nullable=False)
+
+    def __init__(self, value, name, record=None):
+        self.value = value
+        self.name = name
+        self.record = record
+
 class HasFloatDataCollection(object):
     """Mixin to add data collection tables & relationships.
     """
     @declared_attr
     def data(cls):
-        class DataCollection(UniqueId, Base):
-            __tablename__ = cls.data_table_name
-            timestamp = Column(DateTime)
-            values = relationship("DataCollectionValues", backref="record")
-            parent_id = Column(Integer,
-                               ForeignKey("{}.id".format(cls.__tablename__)),
-                               nullable=False)
+        make_cls_name = lambda n: "".join(
+            [s.capitalize() for s in cls.data_table_name.split("_")]) + n
 
-            def __init__(self, parent, values):
-                try:
-                    len(values)
-                    self.values = values
-                except:
-                    self.values = [values]
+        collection = type(make_cls_name("Collection"),
+            (_DataCollection, Base), {
+            "__tablename__": cls.data_table_name,
+            "values": relationship(make_cls_name("CollectionValues"),
+                                   backref="record"),
+            "parent_id": Column(Integer,
+                                ForeignKey("{}.id".format(cls.__tablename__)),
+                                nullable=False),
+        })
 
-                self.parent = parent
+        values = type(make_cls_name("CollectionValues"),
+            (_DataCollectionValues, Base), {
+            "__tablename__": cls.data_table_name + "_values",
+            "record_id": Column(Integer,
+                                ForeignKey("{}.id".format(cls.data_table_name)),
+                                nullable=False),
+        })
 
-        class DataCollectionValues(UniqueId, Base):
-            __tablename__ = cls.data_table_name + "_values"
-            record_id = Column(Integer,
-                               ForeignKey("{}.id".format(cls.data_table_name)),
-                               nullable=False)
-            value = Column(Float)
-            name = Column(Unicode(20), nullable=False)
+        cls.record_type = collection
+        cls.value_type = values
 
-            def __init__(self, value, name, record=None):
-                self.value = value
-                self.name = name
-                self.record = record
-
-        cls.value_type = DataCollectionValues
-        cls.record_type = DataCollection
-
-        return relationship(DataCollection, backref="parent")
+        return relationship(collection, backref="parent")
 
     def _update_data(self, data):
         """Helper function to update the DB with new data values
@@ -129,6 +150,12 @@ class HasFloatDataCollection(object):
         """
         session = Session()
         session.add(self.record_type(self, data))
+
+        try:
+            self.last_update = datetime.utcnow()
+        except AttributeError:
+            pass
+
         session.commit()
         self._latest_data = data
         try:

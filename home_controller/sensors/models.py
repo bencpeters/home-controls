@@ -35,11 +35,11 @@ class Sensor(ThreadedExecutor, Timestamps, UniqueId, BaseType,
 
     @property
     def current_value(self):
-        if getattr(self, "_value", None) is not None:
+        if getattr(self, "_latest_data", None) is not None:
             try:
-                return { v.name: v.value for v in self._value }
+                return { v.name: v.value for v in self._latest_data }
             except TypeError:
-                return self._value.value
+                return self._latest_data.value
 
     def read(self, *args, **kwargs):
         """Inherit this method to read a sensor

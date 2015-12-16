@@ -18,7 +18,7 @@ class RandomValuesSensor(Sensor):
 
     def __init__(self, *args, **kwargs):
         random.seed()
-        self.type = self.types.RANDOM_VALUES.value
+        self.type_ = self.types.RANDOM_VALUES.value
         super(RandomValuesSensor, self).__init__(*args, **kwargs)
 
     def read(self, *args, **kwargs):
@@ -55,7 +55,7 @@ class SineWaveSensor(Sensor):
             raise ValueError("max_value ({}) must be greater than min_value "
                              "({})".format(max_value, min_value))
         self._start = time()
-        self.type = self.types.SINE_WAVE.value
+        self.type_ = self.types.SINE_WAVE.value
         super(SineWaveSensor, self).__init__(**kwargs)
 
     def read(self, *args, **kwargs):

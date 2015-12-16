@@ -5,6 +5,7 @@
 
 from nose.tools import *
 from time import sleep
+from datetime import datetime
 
 from home_controller.tests import DatabaseTest
 from home_controller.sensors import RandomValuesSensor, Sensor, SineWaveSensor
@@ -15,6 +16,7 @@ class TestRandomSensor(DatabaseTest):
     """
     def setup(self):
         self.sensor = RandomValuesSensor(sensor_name="random")
+        self.async_wait_time = 0.1
         super().setup()
 
     def _test_random_value(self, values):
@@ -31,7 +33,7 @@ class TestRandomSensor(DatabaseTest):
 
     def test_update_sensor_reads_sensor(self):
         self.sensor.update()
-        sleep(0.1)
+        sleep(self.async_wait_time)
         records = self.sensor.data
         eq_(len(records), 1)
         self._test_random_value(records[0].values)
@@ -39,16 +41,35 @@ class TestRandomSensor(DatabaseTest):
     def test_update_sensor_adds_objects_to_db(self):
         eq_(len(self.sensor.data), 0)
         self.sensor.update()
-        sleep(0.1)
+        sleep(self.async_wait_time)
         records = self.session.query(Sensor). \
             filter(Sensor.id == self.sensor.id).first().data
         eq_(len(records), 1)
         self._test_random_value(records[0].values)
 
+    def test_current_value(self):
+        self.sensor.update()
+        sleep(self.async_wait_time)
+
+        data = self.session.query(Sensor). \
+            filter(Sensor.id == self.sensor.id).first().data[0]
+
+        curr_val = self.sensor.current_value
+        for val in data.values:
+            ok_(curr_val[val.name] == val.value,
+                "curr_value {} ({}) should equal {}".format(
+                        val.name, curr_val[val.name], val.value))
+
+    def test_last_update(self):
+        start = datetime.now()
+        self.sensor.update()
+        sleep(self.async_wait_time)
+        ok_(self.sensor.last_update > start)
+
 class TestSineWaveSensor(DatabaseTest):
     def setup(self):
         self.period = 0.1
-        self.max = 10
+        self.max = 8
         self.min = -2
         self.sensor = SineWaveSensor(sensor_name="sine", period = self.period,
                                      max_value=self.max, min_value=self.min)
